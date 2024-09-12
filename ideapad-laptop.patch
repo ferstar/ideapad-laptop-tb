@@ -1,0 +1,330 @@
+--- ideapad-laptop.c	2024-09-06 10:14:11.598701819 +0800
++++ ideapad-laptop-tb.c	2024-09-06 10:39:19.168171140 +0800
+@@ -31,7 +31,7 @@
+ #include <linux/sysfs.h>
+ #include <linux/types.h>
+ #include <linux/wmi.h>
+-#include "ideapad-laptop.h"
++#include "ideapad-laptop-tb.h"
+ 
+ #include <acpi/video.h>
+ 
+@@ -152,11 +152,7 @@
+ 		struct led_classdev led;
+ 		unsigned int last_brightness;
+ 	} kbd_bl;
+-	struct {
+-		bool initialized;
+-		struct led_classdev led;
+-		unsigned int last_brightness;
+-	} fn_lock;
++	bool suspended;
+ };
+ 
+ static bool no_bt_rfkill;
+@@ -518,8 +514,11 @@
+ 
+ static DEVICE_ATTR_RW(fan_mode);
+ 
+-static int ideapad_fn_lock_get(struct ideapad_private *priv)
++static ssize_t fn_lock_show(struct device *dev,
++			    struct device_attribute *attr,
++			    char *buf)
+ {
++	struct ideapad_private *priv = dev_get_drvdata(dev);
+ 	unsigned long hals;
+ 	int err;
+ 
+@@ -527,40 +526,7 @@
+ 	if (err)
+ 		return err;
+ 
+-	return !!test_bit(HALS_FNLOCK_STATE_BIT, &hals);
+-}
+-
+-static int ideapad_fn_lock_set(struct ideapad_private *priv, bool state)
+-{
+-	return exec_sals(priv->adev->handle,
+-		state ? SALS_FNLOCK_ON : SALS_FNLOCK_OFF);
+-}
+-
+-static void ideapad_fn_lock_led_notify(struct ideapad_private *priv, int brightness)
+-{
+-	if (!priv->fn_lock.initialized)
+-		return;
+-
+-	if (brightness == priv->fn_lock.last_brightness)
+-		return;
+-
+-	priv->fn_lock.last_brightness = brightness;
+-
+-	led_classdev_notify_brightness_hw_changed(&priv->fn_lock.led, brightness);
+-}
+-
+-static ssize_t fn_lock_show(struct device *dev,
+-			    struct device_attribute *attr,
+-			    char *buf)
+-{
+-	struct ideapad_private *priv = dev_get_drvdata(dev);
+-	int brightness;
+-
+-	brightness = ideapad_fn_lock_get(priv);
+-	if (brightness < 0)
+-		return brightness;
+-
+-	return sysfs_emit(buf, "%d\n", brightness);
++	return sysfs_emit(buf, "%d\n", !!test_bit(HALS_FNLOCK_STATE_BIT, &hals));
+ }
+ 
+ static ssize_t fn_lock_store(struct device *dev,
+@@ -575,12 +541,10 @@
+ 	if (err)
+ 		return err;
+ 
+-	err = ideapad_fn_lock_set(priv, state);
++	err = exec_sals(priv->adev->handle, state ? SALS_FNLOCK_ON : SALS_FNLOCK_OFF);
+ 	if (err)
+ 		return err;
+ 
+-	ideapad_fn_lock_led_notify(priv, state);
+-
+ 	return count;
+ }
+ 
+@@ -1140,6 +1104,8 @@
+ 	{ KE_KEY,	0x27 | IDEAPAD_WMI_KEY, { KEY_HELP } },
+ 	/* Refresh Rate Toggle */
+ 	{ KE_KEY,	0x0a | IDEAPAD_WMI_KEY, { KEY_REFRESH_RATE_TOGGLE } },
++	/* Touchpad Toggle */
++	{ KE_KEY,  0x29 | IDEAPAD_WMI_KEY, { KEY_TOUCHPAD_TOGGLE } },
+ 
+ 	{ KE_END },
+ };
+@@ -1218,11 +1184,8 @@
+ 		switch (bit) {
+ 		case 6:	/* Z570 */
+ 		case 0:	/* Z580 */
+-			/* Thermal Management / Performance Mode button */
+-			if (priv->dytc)
+-				platform_profile_cycle();
+-			else
+-				ideapad_input_report(priv, 65);
++			/* Thermal Management button */
++			ideapad_input_report(priv, 65);
+ 			break;
+ 		case 1:
+ 			/* OneKey Theater button */
+@@ -1503,65 +1466,6 @@
+ }
+ 
+ /*
+- * FnLock LED
+- */
+-static enum led_brightness ideapad_fn_lock_led_cdev_get(struct led_classdev *led_cdev)
+-{
+-	struct ideapad_private *priv = container_of(led_cdev, struct ideapad_private, fn_lock.led);
+-
+-	return ideapad_fn_lock_get(priv);
+-}
+-
+-static int ideapad_fn_lock_led_cdev_set(struct led_classdev *led_cdev,
+-	enum led_brightness brightness)
+-{
+-	struct ideapad_private *priv = container_of(led_cdev, struct ideapad_private, fn_lock.led);
+-
+-	return ideapad_fn_lock_set(priv, brightness);
+-}
+-
+-static int ideapad_fn_lock_led_init(struct ideapad_private *priv)
+-{
+-	int brightness, err;
+-
+-	if (!priv->features.fn_lock)
+-		return -ENODEV;
+-
+-	if (WARN_ON(priv->fn_lock.initialized))
+-		return -EEXIST;
+-
+-	priv->fn_lock.led.max_brightness = 1;
+-
+-	brightness = ideapad_fn_lock_get(priv);
+-	if (brightness < 0)
+-		return brightness;
+-
+-	priv->fn_lock.last_brightness = brightness;
+-	priv->fn_lock.led.name                    = "platform::" LED_FUNCTION_FNLOCK;
+-	priv->fn_lock.led.brightness_get          = ideapad_fn_lock_led_cdev_get;
+-	priv->fn_lock.led.brightness_set_blocking = ideapad_fn_lock_led_cdev_set;
+-	priv->fn_lock.led.flags                   = LED_BRIGHT_HW_CHANGED;
+-
+-	err = led_classdev_register(&priv->platform_device->dev, &priv->fn_lock.led);
+-	if (err)
+-		return err;
+-
+-	priv->fn_lock.initialized = true;
+-
+-	return 0;
+-}
+-
+-static void ideapad_fn_lock_led_exit(struct ideapad_private *priv)
+-{
+-	if (!priv->fn_lock.initialized)
+-		return;
+-
+-	priv->fn_lock.initialized = false;
+-
+-	led_classdev_unregister(&priv->fn_lock.led);
+-}
+-
+-/*
+  * module init/exit
+  */
+ static void ideapad_sync_touchpad_state(struct ideapad_private *priv, bool send_events)
+@@ -1604,6 +1508,16 @@
+ 	struct ideapad_private *priv = data;
+ 	unsigned long vpc1, vpc2, bit;
+ 
++	acpi_handle_info(handle, "event: %lu\n",
++					(unsigned long)event);
++
++	if(!data)
++		acpi_handle_info(handle, "no data");
++
++	return;
++	if (priv->suspended)
++		return;
++
+ 	if (read_ec_data(handle, VPCCMD_R_VPC1, &vpc1))
+ 		return;
+ 
+@@ -1650,6 +1564,7 @@
+ 			break;
+ 		case KBD_BL_KBLC_CHANGED_EVENT:
+ 		case 1:
++		case 0:
+ 			/*
+ 			 * Some IdeaPads report event 1 every ~20
+ 			 * seconds while on battery power; some
+@@ -1658,8 +1573,6 @@
+ 			 * backlight has changed.
+ 			 */
+ 			ideapad_kbd_bl_notify(priv);
+-			break;
+-		case 0:
+ 			ideapad_check_special_buttons(priv);
+ 			break;
+ 		default:
+@@ -1715,6 +1628,7 @@
+ static const struct dmi_system_id ctrl_ps2_aux_port_list[] = {
+ 	{
+ 	/* Lenovo Ideapad Z570 */
++
+ 	.matches = {
+ 		DMI_MATCH(DMI_SYS_VENDOR, "LENOVO"),
+ 		DMI_MATCH(DMI_PRODUCT_VERSION, "Ideapad Z570"),
+@@ -1808,6 +1722,7 @@
+ {
+ 	struct ideapad_wmi_private *wpriv = dev_get_drvdata(&wdev->dev);
+ 	struct ideapad_private *priv;
++	unsigned long result;
+ 
+ 	mutex_lock(&ideapad_shared_mutex);
+ 
+@@ -1815,18 +1730,19 @@
+ 	if (!priv)
+ 		goto unlock;
+ 
++	dev_info(&wdev->dev, "WMI fn-key event: 0x%llx\n", data->integer.value);
+ 	switch (wpriv->event) {
+ 	case IDEAPAD_WMI_EVENT_ESC:
++		dev_info(&wdev->dev, "IDEAPAD_WMI_EVENT_ESC\n");
+ 		ideapad_input_report(priv, 128);
+ 		break;
+ 	case IDEAPAD_WMI_EVENT_FN_KEYS:
+-		if (priv->features.set_fn_lock_led) {
+-			int brightness = ideapad_fn_lock_get(priv);
++		dev_info(&wdev->dev, "IDEAPAD_WMI_EVENT_FN_KEYS\n");
++		if (priv->features.set_fn_lock_led &&
++		    !eval_hals(priv->adev->handle, &result)) {
++			bool state = test_bit(HALS_FNLOCK_STATE_BIT, &result);
+ 
+-			if (brightness >= 0) {
+-				ideapad_fn_lock_set(priv, brightness);
+-				ideapad_fn_lock_led_notify(priv, brightness);
+-			}
++			exec_sals(priv->adev->handle, state ? SALS_FNLOCK_ON : SALS_FNLOCK_OFF);
+ 		}
+ 
+ 		if (data->type != ACPI_TYPE_INTEGER) {
+@@ -1838,10 +1754,6 @@
+ 		dev_dbg(&wdev->dev, "WMI fn-key event: 0x%llx\n",
+ 			data->integer.value);
+ 
+-		/* 0x02 FnLock, 0x03 Esc */
+-		if (data->integer.value == 0x02 || data->integer.value == 0x03)
+-			ideapad_fn_lock_led_notify(priv, data->integer.value == 0x02);
+-
+ 		ideapad_input_report(priv,
+ 				     data->integer.value | IDEAPAD_WMI_KEY);
+ 
+@@ -1863,6 +1775,8 @@
+ 	{ "26CAB2E5-5CF1-46AE-AAC3-4A12B6BA50E6", &ideapad_wmi_context_esc }, /* Yoga 3 */
+ 	{ "56322276-8493-4CE8-A783-98C991274F5E", &ideapad_wmi_context_esc }, /* Yoga 700 */
+ 	{ "8FC0DE0C-B4E4-43FD-B0F3-8871711C1294", &ideapad_wmi_context_fn_keys }, /* Legion 5 */
++	{ "46f16367-fb9d-11ee-a4f6-40c2ba4a5625", &ideapad_wmi_context_esc }, /* ThinkBook 16+ 2024 IMH */
++	{ "077c4a1f-e344-11ee-a4f6-40c2ba413e67", &ideapad_wmi_context_esc }, /* ThinkBook 2024 AMD */
+ 	{},
+ };
+ MODULE_DEVICE_TABLE(wmi, ideapad_wmi_ids);
+@@ -1935,14 +1849,6 @@
+ 			dev_info(&pdev->dev, "Keyboard backlight control not available\n");
+ 	}
+ 
+-	err = ideapad_fn_lock_led_init(priv);
+-	if (err) {
+-		if (err != -ENODEV)
+-			dev_warn(&pdev->dev, "Could not set up FnLock LED: %d\n", err);
+-		else
+-			dev_info(&pdev->dev, "FnLock control not available\n");
+-	}
+-
+ 	/*
+ 	 * On some models without a hw-switch (the yoga 2 13 at least)
+ 	 * VPCCMD_W_RF must be explicitly set to 1 for the wifi to work.
+@@ -1999,7 +1905,6 @@
+ 	for (i = 0; i < IDEAPAD_RFKILL_DEV_NUM; i++)
+ 		ideapad_unregister_rfkill(priv, i);
+ 
+-	ideapad_fn_lock_led_exit(priv);
+ 	ideapad_kbd_bl_exit(priv);
+ 	ideapad_input_exit(priv);
+ 
+@@ -2027,7 +1932,6 @@
+ 	for (i = 0; i < IDEAPAD_RFKILL_DEV_NUM; i++)
+ 		ideapad_unregister_rfkill(priv, i);
+ 
+-	ideapad_fn_lock_led_exit(priv);
+ 	ideapad_kbd_bl_exit(priv);
+ 	ideapad_input_exit(priv);
+ 	ideapad_debugfs_exit(priv);
+@@ -2045,10 +1949,19 @@
+ 	if (priv->dytc)
+ 		dytc_profile_refresh(priv);
+ 
++	priv->suspended = false;
++
++	return 0;
++}
++
++static int ideapad_acpi_suspended(struct device *dev)
++{
++	struct ideapad_private *priv = dev_get_drvdata(dev);
++	priv->suspended = true;
+ 	return 0;
+ }
+ #endif
+-static SIMPLE_DEV_PM_OPS(ideapad_pm, NULL, ideapad_acpi_resume);
++static SIMPLE_DEV_PM_OPS(ideapad_pm, ideapad_acpi_suspended, ideapad_acpi_resume);
+ 
+ static const struct acpi_device_id ideapad_device_ids[] = {
+ 	{"VPC2004", 0},

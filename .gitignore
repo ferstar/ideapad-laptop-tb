@@ -1,0 +1,23 @@
+.vscode
+.idea
+
+# compiled files
+*.o
+*.ko
+*.cmd
+*.mod
+*.mod.c
+Module.symvers
+modules.order
+
+# patched files
+*.orig
+*.rej
+
+# aur
+/aur/*
+!/aur/PKGBUILD
+
+# ideapad-laptop
+ideapad-laptop.c
+ideapad-laptop.h
