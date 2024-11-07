@@ -9,6 +9,7 @@ Tested and works on:
 
 - ThinkBook 2024 16+ IMH with Ubuntu 24.04 with kernel 6.9.3-060903-generic
 - ThinkBook 2024 14 G6+ AHP with Arch Linux with kernel 6.10.9-x64v2-xanmod1-1
+- ThinkBook 16 G6+ AHP with Arch Linux with kernel 6.11.6-x64v4-xanmod1
 
 ## Usage
 
@@ -29,12 +30,7 @@ sudo reboot
 ### Install via makepkg for Arch Linux
 
 ```shell
-cd aur
-makepkg -si
-sudo reboot
-
-# Uninstall
-yay -R ideapad-laptop-tb-dkms
+sudo pacman -S ideapad-laptop-tb-dkms
 ```
 
 ## Known bugs
