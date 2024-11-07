@@ -27,7 +27,7 @@ sudo rm /etc/modprobe.d/blacklist-ideapad-laptop-tb-dkms.conf
 sudo reboot
 ```
 
-### Install via makepkg for Arch Linux
+### Install via pacman for Arch Linux
 
 ```shell
 sudo pacman -S ideapad-laptop-tb-dkms
