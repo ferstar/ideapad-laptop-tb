@@ -13,24 +13,25 @@ Tested and works on:
 
 ## Usage
 
-### Install via dkms for Ubuntu
-
-```shell
-make
-sudo make install-dkms
-sudo cp dkms/blacklist-ideapad-laptop-tb-dkms.conf /etc/modprobe.d/
-sudo reboot
-
-# Uninstall
-sudo make uninstall-dkms
-sudo rm /etc/modprobe.d/blacklist-ideapad-laptop-tb-dkms.conf
-sudo reboot
-```
-
 ### Install via pacman for Arch Linux
 
 ```shell
 sudo pacman -S ideapad-laptop-tb-dkms
+```
+
+### Install via dkms for Other Linux Distributions
+
+```shell
+make
+sudo dkms add .
+sudo dkms install ideapad-laptop-tb/6.10
+sudo cp dkms/blacklist-ideapad-laptop-tb-dkms.conf /etc/modprobe.d/
+sudo reboot
+
+# Uninstall
+sudo dkms remove ideapad-laptop-tb/6.10 --all
+sudo rm /etc/modprobe.d/blacklist-ideapad-laptop-tb-dkms.conf
+sudo reboot
 ```
 
 ## Known bugs
