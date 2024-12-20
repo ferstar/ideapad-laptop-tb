@@ -6,9 +6,9 @@ MODULE_NAME = ideapad-laptop-tb
 obj-m := $(MODULE_NAME).o
 
 all:
-	make -C $(KERNEL_DIR)/build/ M=$(PWD) modules
+	$(MAKE) -C $(KERNEL_DIR)/build/ M=$(PWD) modules
 clean:
-	make -C $(KERNEL_DIR)/build/ M=$(PWD) clean
+	$(MAKE) -C $(KERNEL_DIR)/build/ M=$(PWD) clean
 
 install:
 	sudo insmod ideapad-laptop-tb.ko
