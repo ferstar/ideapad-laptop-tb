@@ -41,10 +41,10 @@
 #define IDEAPAD_RFKILL_DEV_NUM	3
 
 enum {
-	CFG_CAP_BT_BIT       = 16,
-	CFG_CAP_3G_BIT       = 17,
-	CFG_CAP_WIFI_BIT     = 18,
-	CFG_CAP_CAM_BIT      = 19,
+	CFG_CAP_BT_BIT = 16,
+	CFG_CAP_3G_BIT,
+	CFG_CAP_WIFI_BIT,
+	CFG_CAP_CAM_BIT,
 
 	/*
 	 * These are OnScreenDisplay support bits that can be useful to determine
@@ -52,11 +52,11 @@ enum {
 	 * meaningful since they were introduced later, i.e. 2010 IdeaPads
 	 * don't have these, but they still have had OSD for hotkeys.
 	 */
-	CFG_OSD_NUMLK_BIT    = 27,
-	CFG_OSD_CAPSLK_BIT   = 28,
-	CFG_OSD_MICMUTE_BIT  = 29,
-	CFG_OSD_TOUCHPAD_BIT = 30,
-	CFG_OSD_CAM_BIT      = 31,
+	CFG_OSD_NUMLK_BIT = 27,
+	CFG_OSD_CAPSLK_BIT,
+	CFG_OSD_MICMUTE_BIT,
+	CFG_OSD_TOUCHPAD_BIT,
+	CFG_OSD_CAM_BIT,
 };
 
 enum {
@@ -69,22 +69,22 @@ enum {
 };
 
 enum {
-	HALS_KBD_BL_SUPPORT_BIT       = 4,
-	HALS_KBD_BL_STATE_BIT         = 5,
-	HALS_USB_CHARGING_SUPPORT_BIT = 6,
-	HALS_USB_CHARGING_STATE_BIT   = 7,
-	HALS_FNLOCK_SUPPORT_BIT       = 9,
-	HALS_FNLOCK_STATE_BIT         = 10,
-	HALS_HOTKEYS_PRIMARY_BIT      = 11,
+	HALS_KBD_BL_SUPPORT_BIT = 4,
+	HALS_KBD_BL_STATE_BIT,
+	HALS_USB_CHARGING_SUPPORT_BIT,
+	HALS_USB_CHARGING_STATE_BIT,
+	HALS_FNLOCK_SUPPORT_BIT = 9,
+	HALS_FNLOCK_STATE_BIT,
+	HALS_HOTKEYS_PRIMARY_BIT,
 };
 
 enum {
-	SALS_KBD_BL_ON        = 0x8,
-	SALS_KBD_BL_OFF       = 0x9,
-	SALS_USB_CHARGING_ON  = 0xa,
-	SALS_USB_CHARGING_OFF = 0xb,
-	SALS_FNLOCK_ON        = 0xe,
-	SALS_FNLOCK_OFF       = 0xf,
+	SALS_KBD_BL_ON = 0x8,
+	SALS_KBD_BL_OFF,
+	SALS_USB_CHARGING_ON,
+	SALS_USB_CHARGING_OFF,
+	SALS_FNLOCK_ON = 0xe,
+	SALS_FNLOCK_OFF,
 };
 
 /*
@@ -94,9 +94,9 @@ enum {
  * so it effectively has 3 states, but needs to handle 4
  */
 enum {
-	KBD_BL_STANDARD      = 1,
-	KBD_BL_TRISTATE      = 2,
-	KBD_BL_TRISTATE_AUTO = 3,
+	KBD_BL_STANDARD = 1,
+	KBD_BL_TRISTATE,
+	KBD_BL_TRISTATE_AUTO,
 };
 
 #define KBD_BL_QUERY_TYPE		0x1

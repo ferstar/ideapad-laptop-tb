@@ -36,7 +36,7 @@ enum {
 	VPCCMD_R_RF,
 	VPCCMD_W_RF,
 	VPCCMD_W_YMC = 0x2A,
-	VPCCMD_R_FAN = 0x2B,
+	VPCCMD_R_FAN,
 	VPCCMD_R_SPECIAL_BUTTONS = 0x31,
 	VPCCMD_W_BL_POWER = 0x33,
 };
@@ -149,4 +149,9 @@ static inline int write_ec_cmd(acpi_handle handle, unsigned long cmd, unsigned l
 }
 
 #undef IDEAPAD_EC_TIMEOUT
+
+int ideapad_laptop_register_notifier(struct notifier_block *nb);
+int ideapad_laptop_unregister_notifier(struct notifier_block *nb);
+void ideapad_laptop_call_notifier(unsigned long action, void *data);
+
 #endif /* !_IDEAPAD_LAPTOP_H_ */
