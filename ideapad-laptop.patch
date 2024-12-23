@@ -1,569 +1,72 @@
---- ideapad-laptop.c	2024-11-04 09:46:39.407126066 +0800
-+++ ideapad-laptop-tb.c	2024-11-04 09:46:38.313809094 +0800
-@@ -13,7 +13,6 @@
- #include <linux/bitfield.h>
- #include <linux/bitops.h>
- #include <linux/bug.h>
--#include <linux/cleanup.h>
- #include <linux/debugfs.h>
- #include <linux/device.h>
- #include <linux/dmi.h>
-@@ -32,7 +31,7 @@
- #include <linux/sysfs.h>
- #include <linux/types.h>
- #include <linux/wmi.h>
--#include "ideapad-laptop.h"
-+#include "ideapad-laptop-tb.h"
- 
- #include <acpi/video.h>
- 
-@@ -126,7 +125,6 @@
- 
- struct ideapad_private {
- 	struct acpi_device *adev;
--	struct mutex vpc_mutex; /* protects the VPC calls */
- 	struct rfkill *rfk[IDEAPAD_RFKILL_DEV_NUM];
- 	struct ideapad_rfk_priv rfk_priv[IDEAPAD_RFKILL_DEV_NUM];
- 	struct platform_device *platform_device;
-@@ -155,11 +153,7 @@
+From 2d19a60b8f89c75e6cd9474c3a900b94b7e734aa Mon Sep 17 00:00:00 2001
+From: Mingcong Bai <baimingcong@uniontech.com>
+Date: Sat, 17 Aug 2024 11:32:11 +0800
+Subject: [PATCH] AOSCOS: platform: x86: ideapad-laptop: add fixes for
+ ThinkBook 14+ (2024 G6+)
+
+This is a patch taken from ideapad-laptop-tb2024g6plus in an attempt to
+incorporate these changes in the mainline kernel. This patch fixes
+the following issues:
+
+- Laptop shuts down unexpectedly after closing the lid.
+- The Fn-F5 combination shuts down or resets AMD models.
+- Keyboard backlight status resets after waking up from S3 suspend.
+
+Signed-off-by: Terry <terry.wong2@yahoo.com>
+Link: https://github.com/ty2/ideapad-laptop-tb2024g6plus/blob/6d934407981294d05a6a4e4ed0e59d3c6c964990/ideapad-laptop.patch
+Signed-off-by: Mingcong Bai <baimingcong@uniontech.com>
+Signed-off-by: Kexy Biscuit <kexybiscuit@aosc.io>
+---
+ drivers/platform/x86/ideapad-laptop.c | 29 ++++++++++++++++++++++++---
+ 1 file changed, 26 insertions(+), 3 deletions(-)
+
+diff --git a/ideapad-laptop.c b/ideapad-laptop.c
+index c908f52..a6c7dfd 100644
+--- a/ideapad-laptop.c
++++ b/ideapad-laptop.c
+@@ -188,6 +188,7 @@ struct ideapad_private {
  		struct led_classdev led;
  		unsigned int last_brightness;
- 	} kbd_bl;
--	struct {
--		bool initialized;
--		struct led_classdev led;
--		unsigned int last_brightness;
--	} fn_lock;
+ 	} fn_lock;
 +	bool suspended;
  };
- 
+
  static bool no_bt_rfkill;
-@@ -213,7 +207,7 @@
- {
- 	int ret;
- 
--	guard(mutex)(&ideapad_shared_mutex);
-+	mutex_lock(&ideapad_shared_mutex);
- 
- 	if (!ideapad_shared) {
- 		ideapad_shared = priv;
-@@ -223,15 +217,19 @@
- 		ret = -EINVAL;
- 	}
- 
-+	mutex_unlock(&ideapad_shared_mutex);
-+
- 	return ret;
- }
- 
- static void ideapad_shared_exit(struct ideapad_private *priv)
- {
--	guard(mutex)(&ideapad_shared_mutex);
-+	mutex_lock(&ideapad_shared_mutex);
- 
- 	if (ideapad_shared == priv)
- 		ideapad_shared = NULL;
-+
-+	mutex_unlock(&ideapad_shared_mutex);
- }
- 
- /*
-@@ -302,8 +300,6 @@
- 	struct ideapad_private *priv = s->private;
- 	unsigned long value;
- 
--	guard(mutex)(&priv->vpc_mutex);
--
- 	if (!read_ec_data(priv->adev->handle, VPCCMD_R_BL_MAX, &value))
- 		seq_printf(s, "Backlight max:  %lu\n", value);
- 	if (!read_ec_data(priv->adev->handle, VPCCMD_R_BL, &value))
-@@ -419,14 +415,12 @@
- 				 char *buf)
- {
- 	struct ideapad_private *priv = dev_get_drvdata(dev);
--	unsigned long result = 0;
-+	unsigned long result;
- 	int err;
- 
--	scoped_guard(mutex, &priv->vpc_mutex) {
--		err = read_ec_data(priv->adev->handle, VPCCMD_R_CAMERA, &result);
--		if (err)
--			return err;
--	}
-+	err = read_ec_data(priv->adev->handle, VPCCMD_R_CAMERA, &result);
-+	if (err)
-+		return err;
- 
- 	return sysfs_emit(buf, "%d\n", !!result);
- }
-@@ -443,11 +437,9 @@
- 	if (err)
- 		return err;
- 
--	scoped_guard(mutex, &priv->vpc_mutex) {
--		err = write_ec_cmd(priv->adev->handle, VPCCMD_W_CAMERA, state);
--		if (err)
--			return err;
--	}
-+	err = write_ec_cmd(priv->adev->handle, VPCCMD_W_CAMERA, state);
-+	if (err)
-+		return err;
- 
- 	return count;
- }
-@@ -495,14 +487,12 @@
- 			     char *buf)
- {
- 	struct ideapad_private *priv = dev_get_drvdata(dev);
--	unsigned long result = 0;
-+	unsigned long result;
- 	int err;
- 
--	scoped_guard(mutex, &priv->vpc_mutex) {
--		err = read_ec_data(priv->adev->handle, VPCCMD_R_FAN, &result);
--		if (err)
--			return err;
--	}
-+	err = read_ec_data(priv->adev->handle, VPCCMD_R_FAN, &result);
-+	if (err)
-+		return err;
- 
- 	return sysfs_emit(buf, "%lu\n", result);
- }
-@@ -522,19 +512,20 @@
- 	if (state > 4 || state == 3)
- 		return -EINVAL;
- 
--	scoped_guard(mutex, &priv->vpc_mutex) {
--		err = write_ec_cmd(priv->adev->handle, VPCCMD_W_FAN, state);
--		if (err)
--			return err;
--	}
-+	err = write_ec_cmd(priv->adev->handle, VPCCMD_W_FAN, state);
-+	if (err)
-+		return err;
- 
- 	return count;
- }
- 
- static DEVICE_ATTR_RW(fan_mode);
- 
--static int ideapad_fn_lock_get(struct ideapad_private *priv)
-+static ssize_t fn_lock_show(struct device *dev,
-+			    struct device_attribute *attr,
-+			    char *buf)
- {
-+	struct ideapad_private *priv = dev_get_drvdata(dev);
- 	unsigned long hals;
- 	int err;
- 
-@@ -542,40 +533,7 @@
- 	if (err)
- 		return err;
- 
--	return !!test_bit(HALS_FNLOCK_STATE_BIT, &hals);
--}
--
--static int ideapad_fn_lock_set(struct ideapad_private *priv, bool state)
--{
--	return exec_sals(priv->adev->handle,
--		state ? SALS_FNLOCK_ON : SALS_FNLOCK_OFF);
--}
--
--static void ideapad_fn_lock_led_notify(struct ideapad_private *priv, int brightness)
--{
--	if (!priv->fn_lock.initialized)
--		return;
--
--	if (brightness == priv->fn_lock.last_brightness)
--		return;
--
--	priv->fn_lock.last_brightness = brightness;
--
--	led_classdev_notify_brightness_hw_changed(&priv->fn_lock.led, brightness);
--}
--
--static ssize_t fn_lock_show(struct device *dev,
--			    struct device_attribute *attr,
--			    char *buf)
--{
--	struct ideapad_private *priv = dev_get_drvdata(dev);
--	int brightness;
--
--	brightness = ideapad_fn_lock_get(priv);
--	if (brightness < 0)
--		return brightness;
--
--	return sysfs_emit(buf, "%d\n", brightness);
-+	return sysfs_emit(buf, "%d\n", !!test_bit(HALS_FNLOCK_STATE_BIT, &hals));
- }
- 
- static ssize_t fn_lock_store(struct device *dev,
-@@ -590,12 +548,10 @@
- 	if (err)
- 		return err;
- 
--	err = ideapad_fn_lock_set(priv, state);
-+	err = exec_sals(priv->adev->handle, state ? SALS_FNLOCK_ON : SALS_FNLOCK_OFF);
- 	if (err)
- 		return err;
- 
--	ideapad_fn_lock_led_notify(priv, state);
--
- 	return count;
- }
- 
-@@ -606,14 +562,12 @@
- 			     char *buf)
- {
- 	struct ideapad_private *priv = dev_get_drvdata(dev);
--	unsigned long result = 0;
-+	unsigned long result;
- 	int err;
- 
--	scoped_guard(mutex, &priv->vpc_mutex) {
--		err = read_ec_data(priv->adev->handle, VPCCMD_R_TOUCHPAD, &result);
--		if (err)
--			return err;
--	}
-+	err = read_ec_data(priv->adev->handle, VPCCMD_R_TOUCHPAD, &result);
-+	if (err)
-+		return err;
- 
- 	priv->r_touchpad_val = result;
- 
-@@ -632,11 +586,9 @@
- 	if (err)
- 		return err;
- 
--	scoped_guard(mutex, &priv->vpc_mutex) {
--		err = write_ec_cmd(priv->adev->handle, VPCCMD_W_TOUCHPAD, state);
--		if (err)
--			return err;
--	}
-+	err = write_ec_cmd(priv->adev->handle, VPCCMD_W_TOUCHPAD, state);
-+	if (err)
-+		return err;
- 
- 	priv->r_touchpad_val = state;
- 
-@@ -859,33 +811,36 @@
- 	unsigned long output;
- 	int err;
- 
--	scoped_guard(mutex_intr, &dytc->mutex) {
--		if (profile == PLATFORM_PROFILE_BALANCED) {
--			/* To get back to balanced mode we just issue a reset command */
--			err = eval_dytc(priv->adev->handle, DYTC_CMD_RESET, NULL);
--			if (err)
--				return err;
--		} else {
--			int perfmode;
--
--			err = convert_profile_to_dytc(profile, &perfmode);
--			if (err)
--				return err;
--
--			/* Determine if we are in CQL mode. This alters the commands we do */
--			err = dytc_cql_command(priv,
--					       DYTC_SET_COMMAND(DYTC_FUNCTION_MMC, perfmode, 1),
--					       &output);
--			if (err)
--				return err;
--		}
-+	err = mutex_lock_interruptible(&dytc->mutex);
-+	if (err)
-+		return err;
- 
--		/* Success - update current profile */
--		dytc->current_profile = profile;
--		return 0;
-+	if (profile == PLATFORM_PROFILE_BALANCED) {
-+		/* To get back to balanced mode we just issue a reset command */
-+		err = eval_dytc(priv->adev->handle, DYTC_CMD_RESET, NULL);
-+		if (err)
-+			goto unlock;
-+	} else {
-+		int perfmode;
-+
-+		err = convert_profile_to_dytc(profile, &perfmode);
-+		if (err)
-+			goto unlock;
-+
-+		/* Determine if we are in CQL mode. This alters the commands we do */
-+		err = dytc_cql_command(priv, DYTC_SET_COMMAND(DYTC_FUNCTION_MMC, perfmode, 1),
-+				       &output);
-+		if (err)
-+			goto unlock;
- 	}
- 
--	return -EINTR;
-+	/* Success - update current profile */
-+	dytc->current_profile = profile;
-+
-+unlock:
-+	mutex_unlock(&dytc->mutex);
-+
-+	return err;
- }
- 
- static void dytc_profile_refresh(struct ideapad_private *priv)
-@@ -894,8 +849,9 @@
- 	unsigned long output;
- 	int err, perfmode;
- 
--	scoped_guard(mutex, &priv->dytc->mutex)
--		err = dytc_cql_command(priv, DYTC_CMD_GET, &output);
-+	mutex_lock(&priv->dytc->mutex);
-+	err = dytc_cql_command(priv, DYTC_CMD_GET, &output);
-+	mutex_unlock(&priv->dytc->mutex);
- 	if (err)
- 		return;
- 
-@@ -1027,8 +983,6 @@
- 	struct ideapad_rfk_priv *priv = data;
- 	int opcode = ideapad_rfk_data[priv->dev].opcode;
- 
--	guard(mutex)(&priv->priv->vpc_mutex);
--
- 	return write_ec_cmd(priv->priv->adev->handle, opcode, !blocked);
- }
- 
-@@ -1042,8 +996,6 @@
- 	int i;
- 
- 	if (priv->features.hw_rfkill_switch) {
--		guard(mutex)(&priv->vpc_mutex);
--
- 		if (read_ec_data(priv->adev->handle, VPCCMD_R_RF, &hw_blocked))
- 			return;
- 		hw_blocked = !hw_blocked;
-@@ -1159,6 +1111,8 @@
- 	{ KE_KEY,	0x27 | IDEAPAD_WMI_KEY, { KEY_HELP } },
- 	/* Refresh Rate Toggle */
- 	{ KE_KEY,	0x0a | IDEAPAD_WMI_KEY, { KEY_REFRESH_RATE_TOGGLE } },
+@@ -1297,6 +1298,8 @@ static const struct key_entry ideapad_keymap[] = {
+ 	/* Specific to some newer models */
+ 	{ KE_KEY,	0x3e | IDEAPAD_WMI_KEY, { KEY_MICMUTE } },
+ 	{ KE_KEY,	0x3f | IDEAPAD_WMI_KEY, { KEY_RFKILL } },
 +	/* Touchpad Toggle */
 +	{ KE_KEY,  0x29 | IDEAPAD_WMI_KEY, { KEY_TOUCHPAD_TOGGLE } },
- 
+
  	{ KE_END },
  };
-@@ -1217,9 +1171,8 @@
- {
- 	unsigned long long_pressed;
- 
--	scoped_guard(mutex, &priv->vpc_mutex)
--		if (read_ec_data(priv->adev->handle, VPCCMD_R_NOVO, &long_pressed))
--			return;
-+	if (read_ec_data(priv->adev->handle, VPCCMD_R_NOVO, &long_pressed))
-+		return;
- 
- 	if (long_pressed)
- 		ideapad_input_report(priv, 17);
-@@ -1231,9 +1184,8 @@
- {
- 	unsigned long bit, value;
- 
--	scoped_guard(mutex, &priv->vpc_mutex)
--		if (read_ec_data(priv->adev->handle, VPCCMD_R_SPECIAL_BUTTONS, &value))
--			return;
-+	if (read_ec_data(priv->adev->handle, VPCCMD_R_SPECIAL_BUTTONS, &value))
-+		return;
- 
- 	for_each_set_bit (bit, &value, 16) {
- 		switch (bit) {
-@@ -1266,8 +1218,6 @@
- 	unsigned long now;
- 	int err;
- 
--	guard(mutex)(&priv->vpc_mutex);
--
- 	err = read_ec_data(priv->adev->handle, VPCCMD_R_BL, &now);
- 	if (err)
- 		return err;
-@@ -1280,8 +1230,6 @@
- 	struct ideapad_private *priv = bl_get_data(blightdev);
- 	int err;
- 
--	guard(mutex)(&priv->vpc_mutex);
--
- 	err = write_ec_cmd(priv->adev->handle, VPCCMD_W_BL,
- 			   blightdev->props.brightness);
- 	if (err)
-@@ -1359,8 +1307,6 @@
- 	if (!blightdev)
- 		return;
- 
--	guard(mutex)(&priv->vpc_mutex);
--
- 	if (read_ec_data(priv->adev->handle, VPCCMD_R_BL_POWER, &power))
- 		return;
- 
-@@ -1373,8 +1319,7 @@
- 
- 	/* if we control brightness via acpi video driver */
- 	if (!priv->blightdev)
--		scoped_guard(mutex, &priv->vpc_mutex)
--			read_ec_data(priv->adev->handle, VPCCMD_R_BL, &now);
-+		read_ec_data(priv->adev->handle, VPCCMD_R_BL, &now);
- 	else
- 		backlight_force_update(priv->blightdev, BACKLIGHT_UPDATE_HOTKEY);
- }
-@@ -1531,65 +1476,6 @@
- }
- 
- /*
-- * FnLock LED
-- */
--static enum led_brightness ideapad_fn_lock_led_cdev_get(struct led_classdev *led_cdev)
--{
--	struct ideapad_private *priv = container_of(led_cdev, struct ideapad_private, fn_lock.led);
--
--	return ideapad_fn_lock_get(priv);
--}
--
--static int ideapad_fn_lock_led_cdev_set(struct led_classdev *led_cdev,
--	enum led_brightness brightness)
--{
--	struct ideapad_private *priv = container_of(led_cdev, struct ideapad_private, fn_lock.led);
--
--	return ideapad_fn_lock_set(priv, brightness);
--}
--
--static int ideapad_fn_lock_led_init(struct ideapad_private *priv)
--{
--	int brightness, err;
--
--	if (!priv->features.fn_lock)
--		return -ENODEV;
--
--	if (WARN_ON(priv->fn_lock.initialized))
--		return -EEXIST;
--
--	priv->fn_lock.led.max_brightness = 1;
--
--	brightness = ideapad_fn_lock_get(priv);
--	if (brightness < 0)
--		return brightness;
--
--	priv->fn_lock.last_brightness = brightness;
--	priv->fn_lock.led.name                    = "platform::" LED_FUNCTION_FNLOCK;
--	priv->fn_lock.led.brightness_get          = ideapad_fn_lock_led_cdev_get;
--	priv->fn_lock.led.brightness_set_blocking = ideapad_fn_lock_led_cdev_set;
--	priv->fn_lock.led.flags                   = LED_BRIGHT_HW_CHANGED;
--
--	err = led_classdev_register(&priv->platform_device->dev, &priv->fn_lock.led);
--	if (err)
--		return err;
--
--	priv->fn_lock.initialized = true;
--
--	return 0;
--}
--
--static void ideapad_fn_lock_led_exit(struct ideapad_private *priv)
--{
--	if (!priv->fn_lock.initialized)
--		return;
--
--	priv->fn_lock.initialized = false;
--
--	led_classdev_unregister(&priv->fn_lock.led);
--}
--
--/*
-  * module init/exit
-  */
- static void ideapad_sync_touchpad_state(struct ideapad_private *priv, bool send_events)
-@@ -1599,8 +1485,7 @@
- 	int ret;
- 
- 	/* Without reading from EC touchpad LED doesn't switch state */
--	scoped_guard(mutex, &priv->vpc_mutex)
--		ret = read_ec_data(priv->adev->handle, VPCCMD_R_TOUCHPAD, &value);
-+	ret = read_ec_data(priv->adev->handle, VPCCMD_R_TOUCHPAD, &value);
- 	if (ret)
- 		return;
- 
-@@ -1646,42 +1531,6 @@
- 	{ }
- };
- 
--static void ideapad_laptop_trigger_ec(void)
--{
--	struct ideapad_private *priv;
--	int ret;
--
--	guard(mutex)(&ideapad_shared_mutex);
--
--	priv = ideapad_shared;
--	if (!priv)
--		return;
--
--	if (!priv->features.ymc_ec_trigger)
--		return;
--
--	scoped_guard(mutex, &priv->vpc_mutex)
--		ret = write_ec_cmd(priv->adev->handle, VPCCMD_W_YMC, 1);
--	if (ret)
--		dev_warn(&priv->platform_device->dev, "Could not write YMC: %d\n", ret);
--}
--
--static int ideapad_laptop_nb_notify(struct notifier_block *nb,
--				    unsigned long action, void *data)
--{
--	switch (action) {
--	case IDEAPAD_LAPTOP_YMC_EVENT:
--		ideapad_laptop_trigger_ec();
--		break;
--	}
--
--	return 0;
--}
--
--static struct notifier_block ideapad_laptop_notifier = {
--	.notifier_call = ideapad_laptop_nb_notify,
--};
--
- static BLOCKING_NOTIFIER_HEAD(ideapad_laptop_chain_head);
- 
- int ideapad_laptop_register_notifier(struct notifier_block *nb)
-@@ -1707,13 +1556,21 @@
- 	struct ideapad_private *priv = data;
+@@ -1846,6 +1849,16 @@ static void ideapad_acpi_notify(acpi_handle handle, u32 event, void *data)
  	unsigned long vpc1, vpc2, bit;
- 
--	scoped_guard(mutex, &priv->vpc_mutex) {
--		if (read_ec_data(handle, VPCCMD_R_VPC1, &vpc1))
--			return;
-+	acpi_handle_info(handle, "event: %lu\n",
-+					(unsigned long)event);
- 
--		if (read_ec_data(handle, VPCCMD_R_VPC2, &vpc2))
--			return;
--	}
-+	if(!data)
-+		acpi_handle_info(handle, "no data");
+
+ 	scoped_guard(mutex, &priv->vpc_mutex) {
++		acpi_handle_info(handle, "event: %lu\n",
++						(unsigned long)event);
 +
-+	return;
-+	if (priv->suspended)
-+		return;
++		if(!data)
++			acpi_handle_info(handle, "no data");
++			return;
 +
-+	if (read_ec_data(handle, VPCCMD_R_VPC1, &vpc1))
-+		return;
++		if (priv->suspended)
++			return;
 +
-+	if (read_ec_data(handle, VPCCMD_R_VPC2, &vpc2))
-+		return;
- 
- 	vpc1 = (vpc2 << 8) | vpc1;
- 
-@@ -1755,6 +1612,7 @@
+ 		if (read_ec_data(handle, VPCCMD_R_VPC1, &vpc1))
+ 			return;
+
+@@ -1892,6 +1905,7 @@ static void ideapad_acpi_notify(acpi_handle handle, u32 event, void *data)
+ 			ideapad_backlight_notify_power(priv);
  			break;
  		case KBD_BL_KBLC_CHANGED_EVENT:
- 		case 1:
 +		case 0:
+ 		case 1:
  			/*
  			 * Some IdeaPads report event 1 every ~20
- 			 * seconds while on battery power; some
-@@ -1763,8 +1621,6 @@
+@@ -1901,8 +1915,6 @@ static void ideapad_acpi_notify(acpi_handle handle, u32 event, void *data)
  			 * backlight has changed.
  			 */
  			ideapad_kbd_bl_notify(priv);
@@ -572,78 +75,7 @@
  			ideapad_check_special_buttons(priv);
  			break;
  		default:
-@@ -1820,6 +1676,7 @@
- static const struct dmi_system_id ctrl_ps2_aux_port_list[] = {
- 	{
- 	/* Lenovo Ideapad Z570 */
-+
- 	.matches = {
- 		DMI_MATCH(DMI_SYS_VENDOR, "LENOVO"),
- 		DMI_MATCH(DMI_PRODUCT_VERSION, "Ideapad Z570"),
-@@ -1840,8 +1697,6 @@
- 	priv->features.ctrl_ps2_aux_port =
- 		ctrl_ps2_aux_port || dmi_check_system(ctrl_ps2_aux_port_list);
- 	priv->features.touchpad_ctrl_via_ec = touchpad_ctrl_via_ec;
--	priv->features.ymc_ec_trigger =
--		ymc_ec_trigger || dmi_check_system(ymc_ec_trigger_quirk_dmi_table);
- 
- 	if (!read_ec_data(handle, VPCCMD_R_FAN, &val))
- 		priv->features.fan_mode = true;
-@@ -1915,25 +1770,27 @@
- {
- 	struct ideapad_wmi_private *wpriv = dev_get_drvdata(&wdev->dev);
- 	struct ideapad_private *priv;
-+	unsigned long result;
- 
--	guard(mutex)(&ideapad_shared_mutex);
-+	mutex_lock(&ideapad_shared_mutex);
- 
- 	priv = ideapad_shared;
- 	if (!priv)
--		return;
-+		goto unlock;
- 
-+	dev_info(&wdev->dev, "WMI fn-key event: 0x%llx\n", data->integer.value);
- 	switch (wpriv->event) {
- 	case IDEAPAD_WMI_EVENT_ESC:
-+		dev_info(&wdev->dev, "IDEAPAD_WMI_EVENT_ESC\n");
- 		ideapad_input_report(priv, 128);
- 		break;
- 	case IDEAPAD_WMI_EVENT_FN_KEYS:
--		if (priv->features.set_fn_lock_led) {
--			int brightness = ideapad_fn_lock_get(priv);
-+		dev_info(&wdev->dev, "IDEAPAD_WMI_EVENT_FN_KEYS\n");
-+		if (priv->features.set_fn_lock_led &&
-+		    !eval_hals(priv->adev->handle, &result)) {
-+			bool state = test_bit(HALS_FNLOCK_STATE_BIT, &result);
- 
--			if (brightness >= 0) {
--				ideapad_fn_lock_set(priv, brightness);
--				ideapad_fn_lock_led_notify(priv, brightness);
--			}
-+			exec_sals(priv->adev->handle, state ? SALS_FNLOCK_ON : SALS_FNLOCK_OFF);
- 		}
- 
- 		if (data->type != ACPI_TYPE_INTEGER) {
-@@ -1945,15 +1802,13 @@
- 		dev_dbg(&wdev->dev, "WMI fn-key event: 0x%llx\n",
- 			data->integer.value);
- 
--		/* 0x02 FnLock, 0x03 Esc */
--		if (data->integer.value == 0x02 || data->integer.value == 0x03)
--			ideapad_fn_lock_led_notify(priv, data->integer.value == 0x02);
--
- 		ideapad_input_report(priv,
- 				     data->integer.value | IDEAPAD_WMI_KEY);
- 
- 		break;
- 	}
-+unlock:
-+	mutex_unlock(&ideapad_shared_mutex);
- }
- 
- static const struct ideapad_wmi_private ideapad_wmi_context_esc = {
-@@ -1968,6 +1823,8 @@
+@@ -2106,6 +2118,8 @@ static const struct wmi_device_id ideapad_wmi_ids[] = {
  	{ "26CAB2E5-5CF1-46AE-AAC3-4A12B6BA50E6", &ideapad_wmi_context_esc }, /* Yoga 3 */
  	{ "56322276-8493-4CE8-A783-98C991274F5E", &ideapad_wmi_context_esc }, /* Yoga 700 */
  	{ "8FC0DE0C-B4E4-43FD-B0F3-8871711C1294", &ideapad_wmi_context_fn_keys }, /* Legion 5 */
@@ -652,70 +84,10 @@
  	{},
  };
  MODULE_DEVICE_TABLE(wmi, ideapad_wmi_ids);
-@@ -2020,10 +1877,6 @@
- 	priv->adev = adev;
- 	priv->platform_device = pdev;
- 
--	err = devm_mutex_init(&pdev->dev, &priv->vpc_mutex);
--	if (err)
--		return err;
--
- 	ideapad_check_features(priv);
- 
- 	err = ideapad_sysfs_init(priv);
-@@ -2044,14 +1897,6 @@
- 			dev_info(&pdev->dev, "Keyboard backlight control not available\n");
- 	}
- 
--	err = ideapad_fn_lock_led_init(priv);
--	if (err) {
--		if (err != -ENODEV)
--			dev_warn(&pdev->dev, "Could not set up FnLock LED: %d\n", err);
--		else
--			dev_info(&pdev->dev, "FnLock control not available\n");
--	}
--
- 	/*
- 	 * On some models without a hw-switch (the yoga 2 13 at least)
- 	 * VPCCMD_W_RF must be explicitly set to 1 for the wifi to work.
-@@ -2092,8 +1937,6 @@
- 	if (err)
- 		goto shared_init_failed;
- 
--	ideapad_laptop_register_notifier(&ideapad_laptop_notifier);
--
- 	return 0;
- 
- shared_init_failed:
-@@ -2110,7 +1953,6 @@
- 	for (i = 0; i < IDEAPAD_RFKILL_DEV_NUM; i++)
- 		ideapad_unregister_rfkill(priv, i);
- 
--	ideapad_fn_lock_led_exit(priv);
- 	ideapad_kbd_bl_exit(priv);
- 	ideapad_input_exit(priv);
- 
-@@ -2126,8 +1968,6 @@
- 	struct ideapad_private *priv = dev_get_drvdata(&pdev->dev);
- 	int i;
- 
--	ideapad_laptop_unregister_notifier(&ideapad_laptop_notifier);
--
- 	ideapad_shared_exit(priv);
- 
- 	acpi_remove_notify_handler(priv->adev->handle,
-@@ -2140,7 +1980,6 @@
- 	for (i = 0; i < IDEAPAD_RFKILL_DEV_NUM; i++)
- 		ideapad_unregister_rfkill(priv, i);
- 
--	ideapad_fn_lock_led_exit(priv);
- 	ideapad_kbd_bl_exit(priv);
- 	ideapad_input_exit(priv);
- 	ideapad_debugfs_exit(priv);
-@@ -2158,10 +1997,19 @@
+@@ -2296,10 +2310,19 @@ static int ideapad_acpi_resume(struct device *dev)
  	if (priv->dytc)
  		dytc_profile_refresh(priv);
- 
+
 +	priv->suspended = false;
 +
 +	return 0;
@@ -730,6 +102,15 @@
  #endif
 -static SIMPLE_DEV_PM_OPS(ideapad_pm, NULL, ideapad_acpi_resume);
 +static SIMPLE_DEV_PM_OPS(ideapad_pm, ideapad_acpi_suspended, ideapad_acpi_resume);
- 
+
  static const struct acpi_device_id ideapad_device_ids[] = {
  	{"VPC2004", 0},
+@@ -2309,7 +2332,7 @@ MODULE_DEVICE_TABLE(acpi, ideapad_device_ids);
+
+ static struct platform_driver ideapad_acpi_driver = {
+ 	.probe = ideapad_acpi_add,
+-	.remove_new = ideapad_acpi_remove,
++	.remove = ideapad_acpi_remove,
+ 	.driver = {
+ 		.name   = "ideapad_acpi",
+ 		.pm     = &ideapad_pm,
