@@ -1853,9 +1853,10 @@ static void ideapad_acpi_notify(acpi_handle handle, u32 event, void *data)
 		acpi_handle_info(handle, "event: %lu\n",
 						(unsigned long)event);
 
-		if(!data)
+		if(!data){
 			acpi_handle_info(handle, "no data");
 			return;
+		}
 
 		if (priv->suspended)
 			return;
