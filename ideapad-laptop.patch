@@ -1,30 +1,15 @@
-From 2d19a60b8f89c75e6cd9474c3a900b94b7e734aa Mon Sep 17 00:00:00 2001
-From: Mingcong Bai <baimingcong@uniontech.com>
-Date: Sat, 17 Aug 2024 11:32:11 +0800
-Subject: [PATCH] AOSCOS: platform: x86: ideapad-laptop: add fixes for
- ThinkBook 14+ (2024 G6+)
-
-This is a patch taken from ideapad-laptop-tb2024g6plus in an attempt to
-incorporate these changes in the mainline kernel. This patch fixes
-the following issues:
-
-- Laptop shuts down unexpectedly after closing the lid.
-- The Fn-F5 combination shuts down or resets AMD models.
-- Keyboard backlight status resets after waking up from S3 suspend.
-
-Signed-off-by: Terry <terry.wong2@yahoo.com>
-Link: https://github.com/ty2/ideapad-laptop-tb2024g6plus/blob/6d934407981294d05a6a4e4ed0e59d3c6c964990/ideapad-laptop.patch
-Signed-off-by: Mingcong Bai <baimingcong@uniontech.com>
-Signed-off-by: Kexy Biscuit <kexybiscuit@aosc.io>
----
- drivers/platform/x86/ideapad-laptop.c | 29 ++++++++++++++++++++++++---
- 1 file changed, 26 insertions(+), 3 deletions(-)
-
-diff --git a/ideapad-laptop.c b/ideapad-laptop.c
-index c908f52..a6c7dfd 100644
---- a/ideapad-laptop.c
-+++ b/ideapad-laptop.c
-@@ -188,6 +188,7 @@ struct ideapad_private {
+--- ideapad-laptop.c	2025-01-11 19:28:33.173517541 +0800
++++ ideapad-laptop-tb.c	2025-01-11 19:58:50.711543174 +0800
+@@ -32,7 +32,7 @@
+ #include <linux/sysfs.h>
+ #include <linux/types.h>
+ #include <linux/wmi.h>
+-#include "ideapad-laptop.h"
++#include "ideapad-laptop-tb.h"
+ 
+ #include <acpi/video.h>
+ 
+@@ -188,6 +188,7 @@
  		struct led_classdev led;
  		unsigned int last_brightness;
  	} fn_lock;
@@ -32,16 +17,19 @@ index c908f52..a6c7dfd 100644
  };
 
  static bool no_bt_rfkill;
-@@ -1297,6 +1298,8 @@ static const struct key_entry ideapad_keymap[] = {
+@@ -1297,7 +1298,10 @@
  	/* Specific to some newer models */
  	{ KE_KEY,	0x3e | IDEAPAD_WMI_KEY, { KEY_MICMUTE } },
  	{ KE_KEY,	0x3f | IDEAPAD_WMI_KEY, { KEY_RFKILL } },
+-
 +	/* Touchpad Toggle */
 +	{ KE_KEY,  0x29 | IDEAPAD_WMI_KEY, { KEY_TOUCHPAD_TOGGLE } },
-
++	/* Print Screen */
++	{ KE_KEY,  0x2d | IDEAPAD_WMI_KEY, { KEY_PRINT } },
  	{ KE_END },
  };
-@@ -1846,6 +1849,16 @@ static void ideapad_acpi_notify(acpi_handle handle, u32 event, void *data)
+ 
+@@ -1846,6 +1850,17 @@
  	unsigned long vpc1, vpc2, bit;
 
  	scoped_guard(mutex, &priv->vpc_mutex) {
@@ -58,7 +46,7 @@ index c908f52..a6c7dfd 100644
  		if (read_ec_data(handle, VPCCMD_R_VPC1, &vpc1))
  			return;
 
-@@ -1892,6 +1905,7 @@ static void ideapad_acpi_notify(acpi_handle handle, u32 event, void *data)
+@@ -1892,6 +1907,7 @@
  			ideapad_backlight_notify_power(priv);
  			break;
  		case KBD_BL_KBLC_CHANGED_EVENT:
@@ -66,7 +54,7 @@ index c908f52..a6c7dfd 100644
  		case 1:
  			/*
  			 * Some IdeaPads report event 1 every ~20
-@@ -1901,8 +1915,6 @@ static void ideapad_acpi_notify(acpi_handle handle, u32 event, void *data)
+@@ -1901,8 +1917,6 @@
  			 * backlight has changed.
  			 */
  			ideapad_kbd_bl_notify(priv);
@@ -75,7 +63,7 @@ index c908f52..a6c7dfd 100644
  			ideapad_check_special_buttons(priv);
  			break;
  		default:
-@@ -2106,6 +2118,8 @@ static const struct wmi_device_id ideapad_wmi_ids[] = {
+@@ -2106,6 +2120,9 @@
  	{ "26CAB2E5-5CF1-46AE-AAC3-4A12B6BA50E6", &ideapad_wmi_context_esc }, /* Yoga 3 */
  	{ "56322276-8493-4CE8-A783-98C991274F5E", &ideapad_wmi_context_esc }, /* Yoga 700 */
  	{ "8FC0DE0C-B4E4-43FD-B0F3-8871711C1294", &ideapad_wmi_context_fn_keys }, /* Legion 5 */
@@ -84,7 +72,7 @@ index c908f52..a6c7dfd 100644
  	{},
  };
  MODULE_DEVICE_TABLE(wmi, ideapad_wmi_ids);
-@@ -2296,10 +2310,19 @@ static int ideapad_acpi_resume(struct device *dev)
+@@ -2296,10 +2313,19 @@
  	if (priv->dytc)
  		dytc_profile_refresh(priv);
 
@@ -105,7 +93,7 @@ index c908f52..a6c7dfd 100644
 
  static const struct acpi_device_id ideapad_device_ids[] = {
  	{"VPC2004", 0},
-@@ -2309,7 +2332,7 @@ MODULE_DEVICE_TABLE(acpi, ideapad_device_ids);
+@@ -2309,7 +2335,7 @@
 
  static struct platform_driver ideapad_acpi_driver = {
  	.probe = ideapad_acpi_add,
