@@ -1301,8 +1301,7 @@ static const struct key_entry ideapad_keymap[] = {
 	{ KE_KEY,	0x3f | IDEAPAD_WMI_KEY, { KEY_RFKILL } },
 	/* Touchpad Toggle */
 	{ KE_KEY,  0x29 | IDEAPAD_WMI_KEY, { KEY_TOUCHPAD_TOGGLE } },
-	/* Print Screen */
-	{ KE_KEY,  0x2d | IDEAPAD_WMI_KEY, { KEY_PRINT } },
+
 	{ KE_END },
 };
 
@@ -1861,10 +1860,9 @@ static void ideapad_acpi_notify(acpi_handle handle, u32 event, void *data)
 		acpi_handle_info(handle, "event: %lu\n",
 						(unsigned long)event);
 
-		if(!data){
+		if(!data)
 			acpi_handle_info(handle, "no data");
 			return;
-		}
 
 		if (priv->suspended)
 			return;
@@ -2130,7 +2128,6 @@ static const struct wmi_device_id ideapad_wmi_ids[] = {
 	{ "8FC0DE0C-B4E4-43FD-B0F3-8871711C1294", &ideapad_wmi_context_fn_keys }, /* Legion 5 */
 	{ "46f16367-fb9d-11ee-a4f6-40c2ba4a5625", &ideapad_wmi_context_esc }, /* ThinkBook 16+ 2024 IMH */
 	{ "077c4a1f-e344-11ee-a4f6-40c2ba413e67", &ideapad_wmi_context_esc }, /* ThinkBook 2024 AMD */
-	{ "32b0d441-1cba-11ef-a4f6-40c2ba54d301", &ideapad_wmi_context_esc }, /* ThinkBook 14+ 2024 AGH */
 	{},
 };
 MODULE_DEVICE_TABLE(wmi, ideapad_wmi_ids);
