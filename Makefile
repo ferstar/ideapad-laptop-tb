@@ -6,7 +6,7 @@ MODULE_NAME = ideapad-laptop-tb
 obj-m := $(MODULE_NAME).o
 
 all:
-	$(MAKE) -C $(KERNEL_DIR)/build/ M=$(PWD) LLVM=1 modules
+	$(MAKE) -C $(KERNEL_DIR)/build/ M=$(PWD) modules
 clean:
 	$(MAKE) -C $(KERNEL_DIR)/build/ M=$(PWD) clean
 
