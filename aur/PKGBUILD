@@ -10,7 +10,7 @@ url="https://github.com/ferstar/${_repo}"
 arch=('any')
 license=('GPL2')
 depends=('dkms')
-makedepends=('git')
+makedepends=('git' 'curl')
 provides=("${_module_name}=${pkgver}")
 conflicts=("${_module_name}")
 source=("git+https://github.com/ferstar/${_repo}")
@@ -18,6 +18,14 @@ sha256sums=('SKIP')
 
 
 package() {
+  # sync and apply patch
+  KBASE=$(uname -r | cut -d. -f1-2)
+  cd "${srcdir}"/"${_repo}"
+  curl -L -o ideapad-laptop-tb.c https://github.com/torvalds/linux/raw/v${KBASE}/drivers/platform/x86/ideapad-laptop.c
+  curl -L -o ideapad-laptop-tb.h https://github.com/torvalds/linux/raw/v${KBASE}/drivers/platform/x86/ideapad-laptop.h
+  patch < ideapad-laptop.patch
+  cd -
+
   _dkms_dest="${pkgdir}"/usr/src/${_module_name}-${pkgver}
   
   # create dkms dest dir

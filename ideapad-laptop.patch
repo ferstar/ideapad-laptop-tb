@@ -15,39 +15,36 @@
  	} fn_lock;
 +	bool suspended;
  };
- 
+
  static bool no_bt_rfkill;
-@@ -1297,7 +1298,10 @@
+@@ -1297,6 +1298,8 @@
  	/* Specific to some newer models */
  	{ KE_KEY,	0x3e | IDEAPAD_WMI_KEY, { KEY_MICMUTE } },
  	{ KE_KEY,	0x3f | IDEAPAD_WMI_KEY, { KEY_RFKILL } },
--
 +	/* Touchpad Toggle */
 +	{ KE_KEY,  0x29 | IDEAPAD_WMI_KEY, { KEY_TOUCHPAD_TOGGLE } },
-+	/* Print Screen */
-+	{ KE_KEY,  0x2d | IDEAPAD_WMI_KEY, { KEY_PRINT } },
+
  	{ KE_END },
  };
- 
-@@ -1846,6 +1850,17 @@
+@@ -1846,6 +1849,17 @@
  	unsigned long vpc1, vpc2, bit;
- 
+
  	scoped_guard(mutex, &priv->vpc_mutex) {
 +		acpi_handle_info(handle, "event: %lu\n",
 +						(unsigned long)event);
 +
-+		if(!data){
++		if(!data) {
 +			acpi_handle_info(handle, "no data");
 +			return;
-+		}
++       }
 +
 +		if (priv->suspended)
 +			return;
 +
  		if (read_ec_data(handle, VPCCMD_R_VPC1, &vpc1))
  			return;
- 
-@@ -1892,6 +1907,7 @@
+
+@@ -1892,6 +1905,7 @@
  			ideapad_backlight_notify_power(priv);
  			break;
  		case KBD_BL_KBLC_CHANGED_EVENT:
@@ -55,7 +52,7 @@
  		case 1:
  			/*
  			 * Some IdeaPads report event 1 every ~20
-@@ -1901,8 +1917,6 @@
+@@ -1901,8 +1915,6 @@
  			 * backlight has changed.
  			 */
  			ideapad_kbd_bl_notify(priv);
@@ -64,7 +61,7 @@
  			ideapad_check_special_buttons(priv);
  			break;
  		default:
-@@ -2106,6 +2120,9 @@
+@@ -2106,6 +2118,9 @@
  	{ "26CAB2E5-5CF1-46AE-AAC3-4A12B6BA50E6", &ideapad_wmi_context_esc }, /* Yoga 3 */
  	{ "56322276-8493-4CE8-A783-98C991274F5E", &ideapad_wmi_context_esc }, /* Yoga 700 */
  	{ "8FC0DE0C-B4E4-43FD-B0F3-8871711C1294", &ideapad_wmi_context_fn_keys }, /* Legion 5 */
@@ -74,10 +71,10 @@
  	{},
  };
  MODULE_DEVICE_TABLE(wmi, ideapad_wmi_ids);
-@@ -2296,10 +2313,19 @@
+@@ -2296,10 +2310,19 @@
  	if (priv->dytc)
  		dytc_profile_refresh(priv);
- 
+
 +	priv->suspended = false;
 +
 +	return 0;
@@ -92,15 +89,6 @@
  #endif
 -static SIMPLE_DEV_PM_OPS(ideapad_pm, NULL, ideapad_acpi_resume);
 +static SIMPLE_DEV_PM_OPS(ideapad_pm, ideapad_acpi_suspended, ideapad_acpi_resume);
- 
+
  static const struct acpi_device_id ideapad_device_ids[] = {
  	{"VPC2004", 0},
-@@ -2309,7 +2335,7 @@
- 
- static struct platform_driver ideapad_acpi_driver = {
- 	.probe = ideapad_acpi_add,
--	.remove_new = ideapad_acpi_remove,
-+	.remove = ideapad_acpi_remove,
- 	.driver = {
- 		.name   = "ideapad_acpi",
- 		.pm     = &ideapad_pm,
