@@ -11,7 +11,7 @@ modules:
 
 clean:
 	$(MAKE) -C $(KERNEL_DIR) M=$(CURDIR) clean
-	rm -f *.orig *.rej *.h *.c
+	rm -f *.orig *.rej
 
 KBASE := $(shell uname -r | cut -d. -f1-2)
 sync-source:
