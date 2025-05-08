@@ -1,20 +1,50 @@
---- ideapad-laptop.c    2025-04-17 12:41:49.000000000 +0800
-+++ ideapad-laptop-tb.c 2025-04-17 12:48:29.380615597 +0800
+--- ideapad-laptop.c	2025-05-08 14:12:59.257303879 +0800
++++ ideapad-laptop-tb.c	2025-05-08 14:12:53.765202307 +0800
 @@ -32,7 +32,7 @@
  #include <linux/sysfs.h>
  #include <linux/types.h>
  #include <linux/wmi.h>
 -#include "ideapad-laptop.h"
 +#include "ideapad-laptop-tb.h"
-
+ 
  #include <acpi/video.h>
-
+ 
 @@ -265,7 +265,7 @@
  /*
   * ACPI Helpers
   */
 -#define IDEAPAD_EC_TIMEOUT 200 /* in ms */
 +#define IDEAPAD_EC_TIMEOUT 50 /* in ms */
-
+ 
  static int eval_int(acpi_handle handle, const char *name, unsigned long *res)
  {
+@@ -1308,6 +1308,16 @@
+ 	/* Specific to some newer models */
+ 	{ KE_KEY,	0x3e | IDEAPAD_WMI_KEY, { KEY_MICMUTE } },
+ 	{ KE_KEY,	0x3f | IDEAPAD_WMI_KEY, { KEY_RFKILL } },
++	/* Star- (User Assignable Key) */
++	{ KE_KEY,	0x44 | IDEAPAD_WMI_KEY, { KEY_PROG1 } },
++	/* Eye */
++	{ KE_KEY,	0x45 | IDEAPAD_WMI_KEY, { KEY_PROG3 } },
++	/* Performance toggle also Fn+Q, handled inside ideapad_wmi_notify() */
++	{ KE_KEY,	0x3d | IDEAPAD_WMI_KEY, { KEY_PROG4 } },
++	/* shift + prtsc */
++	{ KE_KEY,   0x2d | IDEAPAD_WMI_KEY, { KEY_CUT } },
++	{ KE_KEY,   0x29 | IDEAPAD_WMI_KEY, { KEY_TOUCHPAD_TOGGLE } },
++	{ KE_KEY,   0x2a | IDEAPAD_WMI_KEY, { KEY_ROOT_MENU } },
+ 
+ 	{ KE_END },
+ };
+@@ -2094,6 +2104,12 @@
+ 		dev_dbg(&wdev->dev, "WMI fn-key event: 0x%llx\n",
+ 			data->integer.value);
+ 
++		/* performance button triggered by 0x3d */
++		if (data->integer.value == 0x3d && priv->dytc) {
++			platform_profile_cycle();
++			break;
++		}
++
+ 		/* 0x02 FnLock, 0x03 Esc */
+ 		if (data->integer.value == 0x02 || data->integer.value == 0x03)
+ 			ideapad_fn_lock_led_notify(priv, data->integer.value == 0x02);
