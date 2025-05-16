@@ -22,8 +22,12 @@ sync-source:
 
 apply-patch:
 	@echo ">>> Applying patch..."
-	patch < $(CURDIR)/ideapad-laptop.patch
-	@echo ">>> Patch applied."
+	@if patch < $(CURDIR)/ideapad-laptop.patch; then \
+		echo ">>> Patch applied."; \
+	else \
+		echo ">>> Patch failed, try to apply manually."; \
+		sed -i 's/IDEAPAD_EC_TIMEOUT 200/IDEAPAD_EC_TIMEOUT 50/g' *.{c,h}; \
+	fi
 
 install-manual: all
 	sudo insmod $(MODULE_NAME).ko
