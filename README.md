@@ -32,6 +32,6 @@ sudo reboot
 
 ## Known bugs
 
-- The Fn + F4(Mute Mic func) works but [LED status not sync](https://github.com/ferstar/ideapad-laptop-tb/issues/16).
+- Kernel version < 6.15: The Fn + F4(Mute Mic func) works but [LED status not sync](https://github.com/ferstar/ideapad-laptop-tb/issues/16).
 
 > Try this: https://github.com/ferstar/lenovo-wmi-hotkey-utilities
