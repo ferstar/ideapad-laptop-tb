@@ -13,16 +13,22 @@ clean:
 	$(MAKE) -C $(KERNEL_DIR) M=$(CURDIR) clean
 	rm -f *.orig *.rej
 
-KBASE := $(shell uname -r | cut -d. -f1-2)
+KVERSION ?= $(shell uname -r)
+KBASE := $(shell echo "$(KVERSION)" | cut -d. -f1-2)
+
 sync-source:
-	@echo ">>> Downloading source files for kernel base v$(KBASE)..."
+	echo ">>> Downloading source files for kernel $(KVERSION) (base v$(KBASE))..."
 	curl -L -o $(CURDIR)/ideapad-laptop-tb.h https://github.com/torvalds/linux/raw/v$(KBASE)/drivers/platform/x86/ideapad-laptop.h
 	curl -L -o $(CURDIR)/ideapad-laptop-tb.c https://github.com/torvalds/linux/raw/v$(KBASE)/drivers/platform/x86/ideapad-laptop.c
-	@echo ">>> Source download complete."
+	echo ">>> Source download complete."
+
+dkms-patch:
+	$(MAKE) sync-source KVERSION=$(kernelver)
+	$(MAKE) apply-patch
 
 apply-patch:
-	@echo ">>> Applying patch..."
-	@if patch < $(CURDIR)/ideapad-laptop.patch; then \
+	echo ">>> Applying patch..."
+	if patch < $(CURDIR)/ideapad-laptop.patch; then \
 		echo ">>> Patch applied."; \
 	else \
 		echo ">>> Patch failed, try to apply manually."; \

@@ -18,14 +18,6 @@ sha256sums=('SKIP')
 
 
 package() {
-  # sync and apply patch
-  KBASE=$(uname -r | cut -d. -f1-2)
-  cd "${srcdir}"/"${_repo}"
-  curl -L -o ideapad-laptop-tb.c https://github.com/torvalds/linux/raw/v${KBASE}/drivers/platform/x86/ideapad-laptop.c
-  curl -L -o ideapad-laptop-tb.h https://github.com/torvalds/linux/raw/v${KBASE}/drivers/platform/x86/ideapad-laptop.h
-  patch < ideapad-laptop.patch || sed -i 's/IDEAPAD_EC_TIMEOUT 200/IDEAPAD_EC_TIMEOUT 50/g' *.{c.h}
-  cd -
-
   _dkms_dest="${pkgdir}"/usr/src/${_module_name}-${pkgver}
   
   # create dkms dest dir
