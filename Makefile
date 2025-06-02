@@ -18,8 +18,8 @@ KBASE := $(shell echo "$(KVERSION)" | cut -d. -f1-2)
 
 sync-source:
 	echo ">>> Downloading source files for kernel $(KVERSION) (base v$(KBASE))..."
-	curl -L -o $(CURDIR)/ideapad-laptop-tb.c "https://gitee.com/mirrors/linux_old1/raw/v$(KBASE)/drivers/platform/x86/ideapad-laptop.c"
-	curl -L -o $(CURDIR)/ideapad-laptop-tb.h "https://gitee.com/mirrors/linux_old1/raw/v(KBASE)/drivers/platform/x86/ideapad-laptop.h"
+	curl -L -o $(CURDIR)/ideapad-laptop-tb.c "https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/plain/drivers/platform/x86/ideapad-laptop.c?h=v$(KBASE)"
+	curl -L -o $(CURDIR)/ideapad-laptop-tb.h "https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/plain/drivers/platform/x86/ideapad-laptop.h?h=v$(KBASE)"
 	echo ">>> Source download complete."
 
 dkms-patch:
