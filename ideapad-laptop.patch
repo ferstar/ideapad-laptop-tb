@@ -17,7 +17,7 @@
  
  #include <acpi/video.h>
 
- @@ -267,6 +268,20 @@ static void ideapad_shared_exit(struct ideapad_private *priv)
+@@ -267,6 +268,20 @@ static void ideapad_shared_exit(struct ideapad_private *priv)
   */
  #define IDEAPAD_EC_TIMEOUT 200 /* in ms */
 
@@ -38,7 +38,7 @@
  static int eval_int(acpi_handle handle, const char *name, unsigned long *res)
  {
  	unsigned long long result;
- @@ -383,7 +398,7 @@ static int read_ec_data(acpi_handle handle, unsigned long cmd, unsigned long *da
+@@ -383,7 +398,7 @@ static int read_ec_data(acpi_handle handle, unsigned long cmd, unsigned long *da
  	end_jiffies = jiffies + msecs_to_jiffies(IDEAPAD_EC_TIMEOUT) + 1;
 
  	while (time_before(jiffies, end_jiffies)) {
