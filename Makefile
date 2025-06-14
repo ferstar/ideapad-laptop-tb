@@ -32,7 +32,7 @@ apply-patch:
 		echo ">>> Patch applied."; \
 	else \
 		echo ">>> Patch failed, try to apply manually."; \
-		sed -i 's/IDEAPAD_EC_TIMEOUT 200/IDEAPAD_EC_TIMEOUT 50/g' *.{c,h}; \
+		sed -i 's/IDEAPAD_EC_TIMEOUT 200/IDEAPAD_EC_TIMEOUT 50/g' $(CURDIR)/*.{c,h}; \
 	fi
 
 install-manual: all
