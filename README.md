@@ -1,5 +1,11 @@
 # The IdeaPad ACPI Extras kernel modules for ThinkBook 2024 NoteBooks
 
+> UPDATE: This patch has been merged into the upstream: https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/commit/?h=v6.15.4&id=7f34fa4589f58c15fd82707bc9ac04da35b3c277
+
+> For people who's kernel version >= 6.15.4, you do not need this manually patch any more.
+
+---
+
 This kernel module solves two problems:
 
 1. Dead Sleep: The laptop turning off after closing the lid.
